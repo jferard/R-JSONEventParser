@@ -71,6 +71,7 @@ enum LexerNumberSubState {
     NumberFracExpMinus,
 }
 
+#[derive(Debug)]
 enum LexerStringSubState {
     None,
     Escape,
@@ -118,6 +119,15 @@ impl<R: Read> JSONLexer<R> {
                 $state = LexerState::None;
             }};
         }
+
+        macro_rules! end_of_unicode {
+            ($code_point:ident, $unicode_index: ident, $string_sub_state: ident) => {{
+                $code_point = 0u32;
+                $unicode_index = 0;
+                $string_sub_state = LexerStringSubState::None;
+            }};
+        }
+
 
         let mut state: LexerState = LexerState::None;
         let mut expect: &[u8; 4] = &[1u8, 2u8, 3u8, 4u8];
@@ -214,7 +224,7 @@ impl<R: Read> JSONLexer<R> {
                             LexerNumberSubState::NegNumberStart => { // -...
                                 match byte {
                                     b'0' => {
-                                        buf.push(0);
+                                        buf.push(b'0');
                                         number_sub_state = LexerNumberSubState::ZeroNumberStart;
                                     }
                                     _ if b'1' <= byte && byte <= b'9' => {
@@ -223,6 +233,7 @@ impl<R: Read> JSONLexer<R> {
                                     }
                                     _ => {
                                         consume_lex_error!("Expected a digit `{}`", byte as char);
+                                        end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
                             }
@@ -379,19 +390,19 @@ impl<R: Read> JSONLexer<R> {
                                 match byte {
                                     b'"' | b'\\' => {
                                         buf.push(byte);
-                                        number_sub_state = LexerNumberSubState::None;
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b'b' => {
                                         buf.push(0x08);
-                                        number_sub_state = LexerNumberSubState::None;
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b'f' => {
                                         buf.push(0x0C);
-                                        number_sub_state = LexerNumberSubState::None;
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b'n' => {
                                         buf.push(b'\n');
-                                        number_sub_state = LexerNumberSubState::None;
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b'r' => {
                                         buf.push(b'\r');
@@ -412,7 +423,25 @@ impl<R: Read> JSONLexer<R> {
                                 }
                             }
                             LexerStringSubState::Unicode => { // \u was seen
-                                if unicode_index == 3 {
+                                if unicode_index <= 3 {
+                                    let n = match byte {
+                                        _ if b'0' <= byte && byte <= b'9' => { Ok((byte - b'0') as u32) }
+                                        _ if b'a' <= byte && byte <= b'f' => { Ok((byte - b'a') as u32 + 10) }
+                                        _ if b'A' <= byte && byte <= b'F' => { Ok((byte - b'A') as u32 + 10) }
+                                        _ => {
+                                            end_of_unicode!(code_point, unicode_index, string_sub_state);
+                                            lex_error!("Unknown hex digit `{}`", byte as char)
+                                        }
+                                    };
+                                    match n {
+                                        Ok(i) => {
+                                            code_point = code_point * 16 + i;
+                                            unicode_index += 1;
+                                        }
+                                        Err(e) => { consumer.consume(Err(e), self.line, self.column); }
+                                    }
+                                }
+                                if unicode_index == 4 {
                                     match char::from_u32(code_point) {
                                         Some(c) => {
                                             let mut bytes = [0u8; 4];
@@ -423,23 +452,7 @@ impl<R: Read> JSONLexer<R> {
                                             consume_lex_error!("This is not a code point `{}`", code_point);
                                         }
                                     };
-                                    code_point = 0u32;
-                                    unicode_index = 0;
-                                    string_sub_state = LexerStringSubState::None;
-                                } else {
-                                    let n = match byte {
-                                        _ if b'0' <= byte && byte <= b'9' => { Ok((byte - b'0') as u32) }
-                                        _ if b'a' <= byte && byte <= b'f' => { Ok((byte - b'a') as u32 + 10) }
-                                        _ if b'A' <= byte && byte <= b'F' => { Ok((byte - b'A') as u32 + 10) }
-                                        _ => { lex_error!("Unknown hex digit `{}`", byte) }
-                                    };
-                                    match n {
-                                        Ok(i) => {
-                                            code_point = code_point * 16 + i;
-                                            unicode_index += 1;
-                                        }
-                                        Err(e) => { consumer.consume(Err(e), self.line, self.column); }
-                                    }
+                                    end_of_unicode!(code_point, unicode_index, string_sub_state);
                                 }
                             }
                             LexerStringSubState::None => {
@@ -456,7 +469,7 @@ impl<R: Read> JSONLexer<R> {
                                         }
                                         buf = vec!();
                                         state = LexerState::None;
-                                        number_sub_state = LexerNumberSubState::None;
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     _ => {
                                         buf.push(byte);
