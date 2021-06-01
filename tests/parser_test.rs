@@ -28,7 +28,7 @@ use r_json_event_parser::json_lexer::{JSONLexConsumer, LexerToken, JSONLexError}
 struct PrintConsumer;
 
 impl JSONLexConsumer for PrintConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>) {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
         println!("{:?}", token);
     }
 }

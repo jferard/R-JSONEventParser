@@ -29,7 +29,7 @@ use r_json_event_parser::byte_source::ByteSource;
 struct PrintConsumer;
 
 impl JSONLexConsumer for PrintConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>) {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
         println!("{:?}", token);
     }
 }
@@ -46,7 +46,7 @@ impl AssertEqualsConsumer {
 
 
 impl JSONLexConsumer for AssertEqualsConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>) {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
         self.tokens.push(token);
     }
 }

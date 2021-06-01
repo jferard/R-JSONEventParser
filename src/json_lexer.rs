@@ -49,7 +49,7 @@ pub struct JSONLexError {
 }
 
 pub trait JSONLexConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>);
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, line: usize, column: usize);
 }
 
 enum LexerState {
@@ -95,13 +95,13 @@ impl<R: Read> JSONLexer<R> {
     }
 
     pub fn lex<C: JSONLexConsumer>(&mut self, consumer: &mut C) {
-        macro_rules! lex_error {
+        macro_rules! consume_lex_error {
             ($($arg:tt)*) => {{
                 consumer.consume(Err(JSONLexError {
                     msg: format!($($arg)*),
                     line: self.line,
                     column: self.column,
-                }));
+                }), self.line, self.column);
             }};
         }
 
@@ -147,22 +147,22 @@ impl<R: Read> JSONLexer<R> {
                                 expected_index = 1;
                             }
                             b'{' => {
-                                consumer.consume(Ok(LexerToken::BeginObject));
+                                consumer.consume(Ok(LexerToken::BeginObject), self.line, self.column);
                             }
                             b'}' => {
-                                consumer.consume(Ok(LexerToken::EndObject));
+                                consumer.consume(Ok(LexerToken::EndObject), self.line, self.column);
                             }
                             b'[' => {
-                                consumer.consume(Ok(LexerToken::BeginArray));
+                                consumer.consume(Ok(LexerToken::BeginArray), self.line, self.column);
                             }
                             b']' => {
-                                consumer.consume(Ok(LexerToken::EndArray));
+                                consumer.consume(Ok(LexerToken::EndArray), self.line, self.column);
                             }
                             b':' => {
-                                consumer.consume(Ok(LexerToken::NameSeparator));
+                                consumer.consume(Ok(LexerToken::NameSeparator), self.line, self.column);
                             }
                             b',' => {
-                                consumer.consume(Ok(LexerToken::ValueSeparator));
+                                consumer.consume(Ok(LexerToken::ValueSeparator), self.line, self.column);
                             }
                             b'-' => {
                                 state = LexerState::Number;
@@ -185,7 +185,7 @@ impl<R: Read> JSONLexer<R> {
                                 buf = vec!(byte);
                             }
                             _ => {
-                                lex_error!("Unexpected char `{}`", byte as char);
+                                consume_lex_error!("Unexpected char `{}`", byte as char);
                             }
                         }
                     }
@@ -193,14 +193,14 @@ impl<R: Read> JSONLexer<R> {
                         if expect[expected_index] == byte {
                             expected_index += 1;
                         } else {
-                            lex_error!("Expected word `{}`", str::from_utf8(expect).unwrap());
+                            consume_lex_error!("Expected word `{}`", str::from_utf8(expect).unwrap());
                             state = LexerState::None
                         }
                     }
                     LexerState::Expect(token) if expected_index == expect.len() => {
                         self.byte_source.unget();
                         expected_index = 0;
-                        consumer.consume(Ok(token));
+                        consumer.consume(Ok(token), self.line, self.column);
                         state = LexerState::None;
                     }
                     LexerState::Number => {  // 6. Numbers
@@ -216,7 +216,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::OtherNumber;
                                     }
                                     _ => {
-                                        lex_error!("Expected a digit `{}`", byte as char);
+                                        consume_lex_error!("Expected a digit `{}`", byte as char);
                                     }
                                 }
                             }
@@ -231,7 +231,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::NumberFracExpStart;
                                     }
                                     _ => {
-                                        consumer.consume(Ok(LexerToken::IntValue("0".into())));
+                                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column);
                                         end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
@@ -252,10 +252,10 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::IntValue(s)));
+                                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column);
                                             }
                                             Err(e) => {
-                                                lex_error!("Can't decode string `{}`", e);
+                                                consume_lex_error!("Can't decode string `{}`", e);
                                             }
                                         }
                                         end_of_number!(buf, number_sub_state, state);
@@ -269,7 +269,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::NumberFrac;
                                     }
                                     _ => {
-                                        lex_error!("Missing decimals `{}`", String::from_utf8(buf).unwrap());
+                                        consume_lex_error!("Missing decimals `{}`", String::from_utf8(buf).unwrap());
                                         end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
@@ -286,10 +286,10 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::FloatValue(s)));
+                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
                                             }
                                             Err(e) => {
-                                                lex_error!("Can't decode string `{}`", e);
+                                                consume_lex_error!("Can't decode string `{}`", e);
                                             }
                                         }
                                         end_of_number!(buf, number_sub_state, state);
@@ -307,7 +307,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::NumberFracExp;
                                     }
                                     _ => {
-                                        lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
+                                        consume_lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
                                         end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
@@ -321,10 +321,10 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::FloatValue(s)));
+                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
                                             }
                                             Err(e) => {
-                                                lex_error!("Can't decode string `{}`", e);
+                                                consume_lex_error!("Can't decode string `{}`", e);
                                             }
                                         }
                                         end_of_number!(buf, number_sub_state, state);
@@ -338,7 +338,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::NumberFracExpMinus;
                                     }
                                     _ => {
-                                        lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
+                                        consume_lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
                                         end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
@@ -352,10 +352,12 @@ impl<R: Read> JSONLexer<R> {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
                                                 consumer.consume(
-                                                    Ok(LexerToken::FloatValue(s)));
+                                                    Ok(LexerToken::FloatValue(s)),
+                                                    self.line,
+                                                    self.column);
                                             }
                                             Err(e) => {
-                                                lex_error!("Can't decode string `{}`", e);
+                                                consume_lex_error!("Can't decode string `{}`", e);
                                             }
                                         }
                                         end_of_number!(buf, number_sub_state, state);
@@ -397,7 +399,7 @@ impl<R: Read> JSONLexer<R> {
                                         string_sub_state = LexerStringSubState::Unicode
                                     }
                                     _ => {
-                                        lex_error!("Unknown escaped char `{}`", byte as char);
+                                        consume_lex_error!("Unknown escaped char `{}`", byte as char);
                                     }
                                 }
                             }
@@ -411,10 +413,10 @@ impl<R: Read> JSONLexer<R> {
                                     b'"' => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::String(s)));
+                                                consumer.consume(Ok(LexerToken::String(s)), self.line, self.column);
                                             }
                                             Err(e) => {
-                                                lex_error!("Can't decode string `{}`", e);
+                                                consume_lex_error!("Can't decode string `{}`", e);
                                             }
                                         }
                                         buf = vec!();
@@ -437,77 +439,77 @@ impl<R: Read> JSONLexer<R> {
             LexerState::Number => {  // finish our number if possible
                 match number_sub_state {
                     LexerNumberSubState::ZeroNumberStart => { // 0
-                        consumer.consume(Ok(LexerToken::IntValue("0".into())));
+                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column);
                     }
                     LexerNumberSubState::NegNumberStart => {
                         // -
-                        lex_error!("Missing digits `{}`", String::from_utf8(buf).unwrap());
+                        consume_lex_error!("Missing digits `{}`", String::from_utf8(buf).unwrap());
                     }
                     LexerNumberSubState::OtherNumber => { // [1-9]
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::IntValue(s)));
+                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column);
                             }
                             Err(e) => {
-                                lex_error!("Can't decode string `{}`", e);
+                                consume_lex_error!("Can't decode string `{}`", e);
                             }
                         }
                     }
                     LexerNumberSubState::NumberFracStart => {
                         //  [0-9]\.
-                        lex_error!("Missing decimals `{}`", String::from_utf8(buf).unwrap());
+                        consume_lex_error!("Missing decimals `{}`", String::from_utf8(buf).unwrap());
                     }
                     LexerNumberSubState::NumberFrac => { // [0-9]\.[0-9]
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)));
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
                             }
                             Err(e) => {
-                                lex_error!("Can't decode string `{}`", e);
+                                consume_lex_error!("Can't decode string `{}`", e);
                             }
                         }
                     }
                     LexerNumberSubState::NumberFracExpStart => {
-                        lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
+                        consume_lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
                     }
                     LexerNumberSubState::NumberFracExp => {
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)));
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
                             }
                             Err(e) => {
-                                lex_error!("Can't decode string `{}`", e);
+                                consume_lex_error!("Can't decode string `{}`", e);
                             }
                         }
                     }
                     LexerNumberSubState::NumberFracExpMinusStart => {
-                        lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
+                        consume_lex_error!("Missing exp `{}`", String::from_utf8(buf).unwrap());
                     }
                     LexerNumberSubState::NumberFracExpMinus => {
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)));
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
                             }
                             Err(e) => {
-                                lex_error!("Can't decode string `{}`", e);
+                                consume_lex_error!("Can't decode string `{}`", e);
                             }
                         }
                     }
                     _ => {
-                        lex_error!("Unexpected sub_state");
+                        consume_lex_error!("Unexpected sub_state");
                     }
                 }
             }
             LexerState::String => {
                 match String::from_utf8(buf) {
-                    Ok(s) => { lex_error!("Unfinished string `{}`", s); }
-                    Err(e) => { lex_error!("Can't decode string `{}`", e); }
+                    Ok(s) => { consume_lex_error!("Unfinished string `{}`", s); }
+                    Err(e) => { consume_lex_error!("Can't decode string `{}`", e); }
                 }
             }
             LexerState::None => {
                 // pass
             }
-            _ => { lex_error!("Unexpected sub_state"); }
+            _ => { consume_lex_error!("Unexpected sub_state"); }
         }
     }
 }

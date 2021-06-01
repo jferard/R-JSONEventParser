@@ -71,7 +71,23 @@ pub struct JSONLexerToParser<'a, C: JSONParseConsumer> {
 }
 
 impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
-    fn consume(&mut self, lex_token: Result<LexerToken, JSONLexError>) {
+    fn consume(&mut self, lex_token: Result<LexerToken, JSONLexError>, line: usize, column: usize) {
+        macro_rules! parse_error {
+            ($($arg:tt)*) => {{
+                Err(JSONParseError {
+                    msg: format!($($arg)*),
+                    line,
+                    column,
+                })
+            }};
+        }
+
+        macro_rules! consume_parse_error {
+            ($($arg:tt)*) => {{
+                self.consumer.consume(parse_error!($($arg)*));
+            }};
+        }
+
         if let Err(e) = lex_token {
             self.consumer.consume(Err(JSONParseError {
                 msg: e.msg,
@@ -109,11 +125,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         Ok(ParserToken::StringValue(s))
                     }
                     t => {
-                        Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        })
+                        parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
                 self.consumer.consume(token);
@@ -129,11 +141,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         Ok(ParserToken::Key(s))
                     }
                     t => {
-                        Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        })
+                        parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
                 self.consumer.consume(token);
@@ -144,11 +152,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         self.state = ParserState::InObjectMemberValue
                     }
                     t => {
-                        self.consumer.consume(Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        }));
+                        consume_parse_error!("Unexpected token `{:?}`", t);
                     }
                 }
             }
@@ -185,11 +189,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         Ok(ParserToken::BeginArray)
                     }
                     t => {
-                        Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        })
+                        parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
                 self.consumer.consume(token);
@@ -204,11 +204,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         self.consumer.consume(Ok(ParserToken::EndObject));
                     }
                     t => {
-                        self.consumer.consume(Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        }));
+                        consume_parse_error!("Unexpected token `{:?}`", t);
                     }
                 }
             }
@@ -249,11 +245,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         Ok(ParserToken::BeginArray)
                     }
                     t => {
-                        Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        })
+                        parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
                 self.consumer.consume(token);
@@ -268,11 +260,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         self.consumer.consume(Ok(ParserToken::EndArray));
                     }
                     t => {
-                        self.consumer.consume(Err(JSONParseError {
-                            msg: format!("Unexpected token `{:?}`", t),
-                            line: 0,
-                            column: 0,
-                        }));
+                        consume_parse_error!("Unexpected token `{:?}`", t);
                     }
                 }
             }
