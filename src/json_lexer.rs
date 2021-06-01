@@ -18,7 +18,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #![allow(unused_variables)]
 
 use std::io::Read;
@@ -95,14 +94,20 @@ impl<R: Read> JSONLexer<R> {
     }
 
     pub fn lex<C: JSONLexConsumer>(&mut self, consumer: &mut C) {
-        macro_rules! consume_lex_error {
+        macro_rules! lex_error {
             ($($arg:tt)*) => {{
-                consumer.consume(Err(JSONLexError {
+                Err(JSONLexError {
                     msg: format!($($arg)*),
                     line: self.line,
                     column: self.column,
-                }), self.line, self.column);
-            }};
+                })
+            }}
+        }
+
+        macro_rules! consume_lex_error {
+            ($($arg:tt)*) => {{
+                consumer.consume(lex_error!($($arg)*), self.line, self.column);
+            }}
         }
 
         macro_rules! end_of_number {
@@ -120,7 +125,8 @@ impl<R: Read> JSONLexer<R> {
         let mut number_sub_state: LexerNumberSubState = LexerNumberSubState::None;
         let mut string_sub_state: LexerStringSubState = LexerStringSubState::None;
         let mut buf: Vec<u8> = vec!();
-        let mut sub_buf = [0u8; 4];
+        let mut code_point: u32 = 0;
+        let mut unicode_index: usize = 0;
 
         while let Some(byte) = self.byte_source.get() {
             self.column += 1;
@@ -373,39 +379,68 @@ impl<R: Read> JSONLexer<R> {
                                 match byte {
                                     b'"' | b'\\' => {
                                         buf.push(byte);
-                                        number_sub_state = LexerNumberSubState::None
+                                        number_sub_state = LexerNumberSubState::None;
                                     }
                                     b'b' => {
                                         buf.push(0x08);
-                                        number_sub_state = LexerNumberSubState::None
+                                        number_sub_state = LexerNumberSubState::None;
                                     }
                                     b'f' => {
                                         buf.push(0x0C);
-                                        number_sub_state = LexerNumberSubState::None
+                                        number_sub_state = LexerNumberSubState::None;
                                     }
                                     b'n' => {
                                         buf.push(b'\n');
-                                        number_sub_state = LexerNumberSubState::None
+                                        number_sub_state = LexerNumberSubState::None;
                                     }
                                     b'r' => {
                                         buf.push(b'\r');
-                                        string_sub_state = LexerStringSubState::None
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b't' => {
                                         buf.push(b'\t');
-                                        string_sub_state = LexerStringSubState::None
+                                        string_sub_state = LexerStringSubState::None;
                                     }
                                     b'u' => {
-                                        string_sub_state = LexerStringSubState::Unicode
+                                        string_sub_state = LexerStringSubState::Unicode;
+                                        code_point = 0u32;
+                                        unicode_index = 0;
                                     }
                                     _ => {
                                         consume_lex_error!("Unknown escaped char `{}`", byte as char);
                                     }
                                 }
                             }
-                            LexerStringSubState::Unicode => {
-                                sub_buf[0] = 1u8;
-                                // TODO
+                            LexerStringSubState::Unicode => { // \u was seen
+                                if unicode_index == 3 {
+                                    match char::from_u32(code_point) {
+                                        Some(c) => {
+                                            let mut bytes = [0u8; 4];
+                                            let utf8_bytes = c.encode_utf8(&mut bytes);
+                                            buf.append(&mut utf8_bytes.as_bytes().to_vec());
+                                        }
+                                        None => {
+                                            consume_lex_error!("This is not a code point `{}`", code_point);
+                                        }
+                                    };
+                                    code_point = 0u32;
+                                    unicode_index = 0;
+                                    string_sub_state = LexerStringSubState::None;
+                                } else {
+                                    let n = match byte {
+                                        _ if b'0' <= byte && byte <= b'9' => { Ok((byte - b'0') as u32) }
+                                        _ if b'a' <= byte && byte <= b'f' => { Ok((byte - b'a') as u32 + 10) }
+                                        _ if b'A' <= byte && byte <= b'F' => { Ok((byte - b'A') as u32 + 10) }
+                                        _ => { lex_error!("Unknown hex digit `{}`", byte) }
+                                    };
+                                    match n {
+                                        Ok(i) => {
+                                            code_point = code_point * 16 + i;
+                                            unicode_index += 1;
+                                        }
+                                        Err(e) => { consumer.consume(Err(e), self.line, self.column); }
+                                    }
+                                }
                             }
                             LexerStringSubState::None => {
                                 match byte {

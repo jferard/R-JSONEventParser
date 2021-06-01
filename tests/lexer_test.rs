@@ -892,3 +892,25 @@ fn test_end() {
     test_read("1.5e-".as_bytes(),
                vec!(Err(JSONLexError { msg: "Missing exp `1.5e-`".into(), line: 0, column: 5 })));
 }
+
+#[test]
+fn test_unicode() {
+    test_read("[\"\\ub9d0\"]".as_bytes(),
+              vec!(
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("\u{b9d}".into())),
+                  Ok(EndArray))
+    );
+    test_read("[\"a\\ub9d0\"]".as_bytes(),
+              vec!(
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("a\u{b9d}".into())),
+                  Ok(EndArray))
+    );
+    test_read("[\"\\ub9d0b\"]".as_bytes(),
+              vec!(
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("\u{b9d}b".into())),
+                  Ok(EndArray))
+    );
+}
