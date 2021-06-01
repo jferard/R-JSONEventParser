@@ -47,8 +47,10 @@ pub struct JSONLexError {
     pub column: usize,
 }
 
+pub struct ConsumeError;
+
 pub trait JSONLexConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, line: usize, column: usize);
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, line: usize, column: usize) -> Result<(), ConsumeError>;
 }
 
 enum LexerState {
@@ -94,7 +96,7 @@ impl<R: Read> JSONLexer<R> {
         }
     }
 
-    pub fn lex<C: JSONLexConsumer>(&mut self, consumer: &mut C) {
+    pub fn lex<C: JSONLexConsumer>(&mut self, consumer: &mut C) -> Result<(), ConsumeError> {
         macro_rules! lex_error {
             ($($arg:tt)*) => {{
                 Err(JSONLexError {
@@ -107,7 +109,7 @@ impl<R: Read> JSONLexer<R> {
 
         macro_rules! consume_lex_error {
             ($($arg:tt)*) => {{
-                consumer.consume(lex_error!($($arg)*), self.line, self.column);
+                consumer.consume(lex_error!($($arg)*), self.line, self.column)?;
             }}
         }
 
@@ -163,22 +165,22 @@ impl<R: Read> JSONLexer<R> {
                                 expected_index = 1;
                             }
                             b'{' => {
-                                consumer.consume(Ok(LexerToken::BeginObject), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::BeginObject), self.line, self.column)?;
                             }
                             b'}' => {
-                                consumer.consume(Ok(LexerToken::EndObject), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::EndObject), self.line, self.column)?;
                             }
                             b'[' => {
-                                consumer.consume(Ok(LexerToken::BeginArray), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::BeginArray), self.line, self.column)?;
                             }
                             b']' => {
-                                consumer.consume(Ok(LexerToken::EndArray), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::EndArray), self.line, self.column)?;
                             }
                             b':' => {
-                                consumer.consume(Ok(LexerToken::NameSeparator), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::NameSeparator), self.line, self.column)?;
                             }
                             b',' => {
-                                consumer.consume(Ok(LexerToken::ValueSeparator), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::ValueSeparator), self.line, self.column)?;
                             }
                             b'-' => {
                                 state = LexerState::Number;
@@ -216,7 +218,7 @@ impl<R: Read> JSONLexer<R> {
                     LexerState::Expect(token) if expected_index == expect.len() => {
                         self.byte_source.unget();
                         expected_index = 0;
-                        consumer.consume(Ok(token), self.line, self.column);
+                        consumer.consume(Ok(token), self.line, self.column)?;
                         state = LexerState::None;
                     }
                     LexerState::Number => {  // 6. Numbers
@@ -248,7 +250,7 @@ impl<R: Read> JSONLexer<R> {
                                         number_sub_state = LexerNumberSubState::NumberFracExpStart;
                                     }
                                     _ => {
-                                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column);
+                                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column)?;
                                         end_of_number!(buf, number_sub_state, state);
                                     }
                                 }
@@ -269,7 +271,7 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column);
+                                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column)?;
                                             }
                                             Err(e) => {
                                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -303,7 +305,7 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
+                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column)?;
                                             }
                                             Err(e) => {
                                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -338,7 +340,7 @@ impl<R: Read> JSONLexer<R> {
                                     _ => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
+                                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column)?;
                                             }
                                             Err(e) => {
                                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -371,7 +373,7 @@ impl<R: Read> JSONLexer<R> {
                                                 consumer.consume(
                                                     Ok(LexerToken::FloatValue(s)),
                                                     self.line,
-                                                    self.column);
+                                                    self.column)?;
                                             }
                                             Err(e) => {
                                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -438,7 +440,7 @@ impl<R: Read> JSONLexer<R> {
                                             code_point = code_point * 16 + i;
                                             unicode_index += 1;
                                         }
-                                        Err(e) => { consumer.consume(Err(e), self.line, self.column); }
+                                        Err(e) => { consumer.consume(Err(e), self.line, self.column)?; }
                                     }
                                 }
                                 if unicode_index == 4 {
@@ -461,7 +463,7 @@ impl<R: Read> JSONLexer<R> {
                                     b'"' => {
                                         match String::from_utf8(buf) {
                                             Ok(s) => {
-                                                consumer.consume(Ok(LexerToken::String(s)), self.line, self.column);
+                                                consumer.consume(Ok(LexerToken::String(s)), self.line, self.column)?;
                                             }
                                             Err(e) => {
                                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -487,7 +489,7 @@ impl<R: Read> JSONLexer<R> {
             LexerState::Number => {  // finish our number if possible
                 match number_sub_state {
                     LexerNumberSubState::ZeroNumberStart => { // 0
-                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column);
+                        consumer.consume(Ok(LexerToken::IntValue("0".into())), self.line, self.column)?;
                     }
                     LexerNumberSubState::NegNumberStart => {
                         // -
@@ -496,7 +498,7 @@ impl<R: Read> JSONLexer<R> {
                     LexerNumberSubState::OtherNumber => { // [1-9]
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::IntValue(s)), self.line, self.column)?;
                             }
                             Err(e) => {
                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -510,7 +512,7 @@ impl<R: Read> JSONLexer<R> {
                     LexerNumberSubState::NumberFrac => { // [0-9]\.[0-9]
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column)?;
                             }
                             Err(e) => {
                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -523,7 +525,7 @@ impl<R: Read> JSONLexer<R> {
                     LexerNumberSubState::NumberFracExp => {
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column)?;
                             }
                             Err(e) => {
                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -536,7 +538,7 @@ impl<R: Read> JSONLexer<R> {
                     LexerNumberSubState::NumberFracExpMinus => {
                         match String::from_utf8(buf) {
                             Ok(s) => {
-                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column);
+                                consumer.consume(Ok(LexerToken::FloatValue(s)), self.line, self.column)?;
                             }
                             Err(e) => {
                                 consume_lex_error!("Can't decode string `{}`", e);
@@ -559,5 +561,6 @@ impl<R: Read> JSONLexer<R> {
             }
             _ => { consume_lex_error!("Unexpected sub_state"); }
         }
+        Ok(())
     }
 }

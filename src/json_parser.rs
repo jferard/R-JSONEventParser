@@ -20,8 +20,9 @@
  */
 
 use std::io::Read;
-use crate::json_lexer::{JSONLexer, JSONLexConsumer, JSONLexError, LexerToken};
+
 use crate::byte_source::ByteSource;
+use crate::json_lexer::{ConsumeError, JSONLexConsumer, JSONLexer, JSONLexError, LexerToken};
 
 #[derive(Debug, PartialEq)]
 pub enum ParserToken {
@@ -39,14 +40,14 @@ pub enum ParserToken {
 
 #[derive(Debug, PartialEq)]
 pub struct JSONParseError {
-    msg: String,
-    line: usize,
-    column: usize,
+    pub msg: String,
+    pub line: usize,
+    pub column: usize,
 }
 
 
 pub trait JSONParseConsumer {
-    fn consume(&mut self, token: Result<ParserToken, JSONParseError>);
+    fn consume(&mut self, token: Result<ParserToken, JSONParseError>) -> Result<(), ConsumeError>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -70,8 +71,8 @@ pub struct JSONLexerToParser<'a, C: JSONParseConsumer> {
     states: Vec<ParserState>,
 }
 
-impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
-    fn consume(&mut self, lex_token: Result<LexerToken, JSONLexError>, line: usize, column: usize) {
+impl<'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, line: usize, column: usize) -> Result<(), ConsumeError> {
         macro_rules! parse_error {
             ($($arg:tt)*) => {{
                 Err(JSONParseError {
@@ -84,27 +85,27 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
 
         macro_rules! consume_parse_error {
             ($($arg:tt)*) => {{
-                self.consumer.consume(parse_error!($($arg)*));
+                self.consumer.consume(parse_error!($($arg)*))?;
             }};
         }
 
-        if let Err(e) = lex_token {
+        if let Err(e) = token {
             self.consumer.consume(Err(JSONParseError {
                 msg: e.msg,
                 line: e.line,
                 column: e.column,
-            }));
-            return;
+            }))?;
+            return Err(ConsumeError);
         }
         match self.state {
             ParserState::None => {
-                let token = match lex_token {
-                    Ok(LexerToken::BeginObject) =>  {
+                let token = match token {
+                    Ok(LexerToken::BeginObject) => {
                         self.states.push(ParserState::None);
                         self.state = ParserState::InObject;
                         Ok(ParserToken::BeginObject)
                     }
-                    Ok(LexerToken::BeginArray) =>  {
+                    Ok(LexerToken::BeginArray) => {
                         self.states.push(ParserState::None);
                         self.state = ParserState::InArray;
                         Ok(ParserToken::BeginArray)
@@ -128,15 +129,15 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
-                self.consumer.consume(token);
+                self.consumer.consume(token)?;
             }
-            ParserState:: InObject => {
-                let token = match lex_token {
+            ParserState::InObject => {
+                let token = match token {
                     Ok(LexerToken::EndObject) => {
                         self.state = self.states.pop().unwrap();
                         Ok(ParserToken::EndObject)
                     }
-                    Ok(LexerToken:: String(s)) => {
+                    Ok(LexerToken::String(s)) => {
                         self.state = ParserState::InObjectMember;
                         Ok(ParserToken::Key(s))
                     }
@@ -144,10 +145,10 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
-                self.consumer.consume(token);
+                self.consumer.consume(token)?;
             }
-            ParserState:: InObjectMember => {
-                match lex_token {
+            ParserState::InObjectMember => {
+                match token {
                     Ok(LexerToken::NameSeparator) => {
                         self.state = ParserState::InObjectMemberValue
                     }
@@ -156,8 +157,8 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                     }
                 }
             }
-            ParserState:: InObjectMemberValue => {
-                let token = match lex_token {
+            ParserState::InObjectMemberValue => {
+                let token = match token {
                     Ok(LexerToken::BooleanValue(b)) => {
                         self.state = ParserState::InObjectSep;
                         Ok(ParserToken::BooleanValue(b))
@@ -192,24 +193,24 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
-                self.consumer.consume(token);
+                self.consumer.consume(token)?;
             }
-            ParserState:: InObjectSep => {
-                match lex_token {
+            ParserState::InObjectSep => {
+                match token {
                     Ok(LexerToken::ValueSeparator) => {
                         self.state = ParserState::InObject
                     }
                     Ok(LexerToken::EndObject) => {
                         self.state = self.states.pop().unwrap();
-                        self.consumer.consume(Ok(ParserToken::EndObject));
+                        self.consumer.consume(Ok(ParserToken::EndObject))?;
                     }
                     t => {
                         consume_parse_error!("Unexpected token `{:?}`", t);
                     }
                 }
             }
-            ParserState:: InArray => {
-                let token = match lex_token {
+            ParserState::InArray => {
+                let token = match token {
                     Ok(LexerToken::EndArray) => {
                         self.state = self.states.pop().unwrap();
                         Ok(ParserToken::EndArray)
@@ -248,16 +249,16 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                         parse_error!("Unexpected token `{:?}`", t)
                     }
                 };
-                self.consumer.consume(token);
+                self.consumer.consume(token)?;
             }
-            ParserState:: InArraySep => {
-                match lex_token {
+            ParserState::InArraySep => {
+                match token {
                     Ok(LexerToken::ValueSeparator) => {
                         self.state = ParserState::InArray
                     }
                     Ok(LexerToken::EndArray) => {
                         self.state = self.states.pop().unwrap();
-                        self.consumer.consume(Ok(ParserToken::EndArray));
+                        self.consumer.consume(Ok(ParserToken::EndArray))?;
                     }
                     t => {
                         consume_parse_error!("Unexpected token `{:?}`", t);
@@ -265,6 +266,7 @@ impl <'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -273,7 +275,7 @@ impl<'a, C: JSONParseConsumer> JSONLexerToParser<'a, C> {
         JSONLexerToParser {
             consumer,
             state: ParserState::None,
-            states: vec!()
+            states: vec!(),
         }
     }
 }
@@ -285,8 +287,8 @@ impl<R: Read> JSONParser<R> {
         }
     }
 
-    pub fn parse<C: JSONParseConsumer>(&mut self, consumer: &mut C) {
+    pub fn parse<C: JSONParseConsumer>(&mut self, consumer: &mut C) -> Result<(), ConsumeError> {
         let mut parser = JSONLexerToParser::new(consumer);
-        self.json_lexer.lex(&mut parser);
+        self.json_lexer.lex(&mut parser)
     }
 }

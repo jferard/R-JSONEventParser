@@ -20,18 +20,12 @@
  */
 
 use std::fs;
+use std::io::Read;
 
 use r_json_event_parser::byte_source::ByteSource;
-use r_json_event_parser::json_parser::{JSONParser, ParserToken, JSONParseError, JSONParseConsumer};
-use r_json_event_parser::json_lexer::{JSONLexConsumer, LexerToken, JSONLexError};
-
-struct PrintConsumer;
-
-impl JSONLexConsumer for PrintConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
-        println!("{:?}", token);
-    }
-}
+use r_json_event_parser::json_lexer::{ConsumeError};
+use r_json_event_parser::json_parser::{JSONParseConsumer, JSONParseError, JSONParser, ParserToken};
+use r_json_event_parser::json_parser::ParserToken::{BeginObject, Key};
 
 struct AssertEqualsConsumer {
     tokens: Vec<Result<ParserToken, JSONParseError>>,
@@ -45,8 +39,9 @@ impl AssertEqualsConsumer {
 
 
 impl JSONParseConsumer for AssertEqualsConsumer {
-    fn consume(&mut self, token: Result<ParserToken, JSONParseError>) {
+    fn consume(&mut self, token: Result<ParserToken, JSONParseError>) -> Result<(), ConsumeError> {
         self.tokens.push(token);
+        Ok(())
     }
 }
 
@@ -100,10 +95,14 @@ fn parse_example1() {
 
 fn test_file(path: &str, expected_tokens: Vec<Result<ParserToken, JSONParseError>>) {
     let f = fs::File::open(path).expect("no file found");
-    let byte_source = ByteSource::new(f);
+    test_read(f, expected_tokens);
+}
+
+fn test_read<R: Read>(read: R, expected_tokens: Vec<Result<ParserToken, JSONParseError>>) {
+    let byte_source = ByteSource::new(read);
     let mut consumer = AssertEqualsConsumer::new();
     let mut parser = JSONParser::new(byte_source);
-    parser.parse(&mut consumer);
+    let _ = parser.parse(&mut consumer);
     assert_eq!(expected_tokens, consumer.tokens);
 }
 
@@ -511,4 +510,20 @@ fn parse_example5() {
         Ok(ParserToken::EndObject),
     );
     test_file(path, expected_tokens);
+}
+
+#[test]
+fn parse_wrong() {
+    test_read("-foo".as_bytes(),
+              vec!(
+                  Err(JSONParseError { msg: "Expected a digit `f`".into(), line: 0, column: 2 })
+              )
+    );
+    test_read("{\"foo\":-,\"bar\":10}".as_bytes(),
+              vec!(
+                  Ok(BeginObject),
+                  Ok(Key("foo".into())),
+                  Err(JSONParseError { msg: "Expected a digit `,`".into(), line: 0, column: 9 })
+              )
+    );
 }

@@ -23,14 +23,15 @@ use std::fs;
 use std::io::Read;
 
 use r_json_event_parser::json_lexer::LexerToken::{IntValue, FloatValue, BeginArray, EndArray};
-use r_json_event_parser::json_lexer::{JSONLexError, JSONLexConsumer, LexerToken, JSONLexer};
+use r_json_event_parser::json_lexer::{JSONLexError, JSONLexConsumer, LexerToken, JSONLexer, ConsumeError};
 use r_json_event_parser::byte_source::ByteSource;
 
 struct PrintConsumer;
 
 impl JSONLexConsumer for PrintConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) -> Result<(), ConsumeError> {
         println!("{:?}", token);
+        Ok(())
     }
 }
 
@@ -46,8 +47,9 @@ impl AssertEqualsConsumer {
 
 
 impl JSONLexConsumer for AssertEqualsConsumer {
-    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) {
+    fn consume(&mut self, token: Result<LexerToken, JSONLexError>, _line: usize, _column: usize) -> Result<(), ConsumeError> {
         self.tokens.push(token);
+        Ok(())
     }
 }
 
@@ -816,7 +818,7 @@ fn test_read<R: Read>(read: R, expected_tokens: Vec<Result<LexerToken, JSONLexEr
     let byte_source = ByteSource::new(read);
     let mut consumer = AssertEqualsConsumer::new();
     let mut lexer = JSONLexer::new(byte_source);
-    lexer.lex(&mut consumer);
+    let _ = lexer.lex(&mut consumer);
     assert_eq!(expected_tokens, consumer.tokens);
 }
 
