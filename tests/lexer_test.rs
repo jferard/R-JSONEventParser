@@ -22,9 +22,9 @@
 use std::fs;
 use std::io::Read;
 
-use r_json_event_parser::json_lexer::LexerToken::{IntValue, FloatValue, BeginArray, EndArray};
-use r_json_event_parser::json_lexer::{JSONLexError, JSONLexConsumer, LexerToken, JSONLexer, ConsumeError};
 use r_json_event_parser::byte_source::ByteSource;
+use r_json_event_parser::json_lexer::{ConsumeError, JSONLexConsumer, JSONLexer, JSONLexError, LexerToken};
+use r_json_event_parser::json_lexer::LexerToken::{BeginArray, BeginFile, EndArray, EndFile, FloatValue, IntValue};
 
 struct PrintConsumer;
 
@@ -57,6 +57,7 @@ impl JSONLexConsumer for AssertEqualsConsumer {
 fn lex_example1() {
     let path = "tests/files/example1.json";
     let expected_tokens = vec!(
+        Ok(LexerToken::BeginFile),
         Ok(LexerToken::BeginObject),
         Ok(LexerToken::String("glossary".into())),
         Ok(LexerToken::NameSeparator),
@@ -121,7 +122,9 @@ fn lex_example1() {
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
-        Ok(LexerToken::EndObject));
+        Ok(LexerToken::EndObject),
+        Ok(LexerToken::EndFile),
+    );
     test_file(path, expected_tokens);
 }
 
@@ -129,6 +132,7 @@ fn lex_example1() {
 fn lex_example2() {
     let path = "tests/files/example2.json";
     let expected_tokens = vec!(
+        Ok(LexerToken::BeginFile),
         Ok(LexerToken::BeginObject),
         Ok(LexerToken::String("menu".into())),
         Ok(LexerToken::NameSeparator),
@@ -179,7 +183,8 @@ fn lex_example2() {
         Ok(LexerToken::EndArray),
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
-        Ok(LexerToken::EndObject)
+        Ok(LexerToken::EndObject),
+        Ok(LexerToken::EndFile),
     );
     test_file(path, expected_tokens);
 }
@@ -188,6 +193,7 @@ fn lex_example2() {
 fn lex_example3() {
     let path = "tests/files/example3.json";
     let expected_tokens = vec!(
+        Ok(LexerToken::BeginFile),
         Ok(LexerToken::BeginObject),
         Ok(LexerToken::String("widget".into())),
         Ok(LexerToken::NameSeparator),
@@ -277,6 +283,7 @@ fn lex_example3() {
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
+        Ok(LexerToken::EndFile),
     );
     test_file(path, expected_tokens);
 }
@@ -285,6 +292,7 @@ fn lex_example3() {
 fn lex_example4() {
     let path = "tests/files/example4.json";
     let expected_tokens = vec!(
+        Ok(LexerToken::BeginFile),
         Ok(LexerToken::BeginObject),
         Ok(LexerToken::String("web-app".into())),
         Ok(LexerToken::NameSeparator),
@@ -620,6 +628,7 @@ fn lex_example4() {
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
+        Ok(LexerToken::EndFile),
     );
     test_file(path, expected_tokens);
 }
@@ -628,6 +637,7 @@ fn lex_example4() {
 fn lex_example5() {
     let path = "tests/files/example5.json";
     let expected_tokens = vec!(
+        Ok(LexerToken::BeginFile),
         Ok(LexerToken::BeginObject),
         Ok(LexerToken::String("menu".into())),
         Ok(LexerToken::NameSeparator),
@@ -805,9 +815,365 @@ fn lex_example5() {
         Ok(LexerToken::EndArray),
         Ok(LexerToken::EndObject),
         Ok(LexerToken::EndObject),
+        Ok(LexerToken::EndFile),
     );
     test_file(path, expected_tokens);
 }
+
+/////////////
+// NUMBERS //
+/////////////
+
+#[test]
+fn test_lonely_numbers() {
+    test_read("0".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("0".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-0".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("0".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-0e7".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("-0e7".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("1".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.52".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.52".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e-2".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e-2".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e-27".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e-27".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e2".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e2".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e27".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e27".into())),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-1".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("-1".into())),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_numbers() {
+    test_read("0]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("0".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-0]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("0".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-0e7]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("-0e7".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("1".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.52]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.52".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e-2]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e-2".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e-27]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e-27".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e2]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e2".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e27]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(FloatValue("1.5e27".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("-1]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(IntValue("-1".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_wrong_number() {
+    test_read("[01]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray), Ok(IntValue("0".into())),
+                  Ok(IntValue("1".into())), Ok(EndArray), Ok(EndFile),
+              ),
+    );
+    test_read("[1.]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "Missing decimals `1.`".into(), line: 0, column: 4 }),
+                  Ok(EndArray), Ok(EndFile),
+              ),
+    );
+    test_read("[-]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "Expected a digit `]`".into(), line: 0, column: 3 }),
+                  Ok(EndArray), Ok(EndFile),
+              ),
+    );
+    test_read("[1.5e]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "Missing exp `1.5e`".into(), line: 0, column: 6 }),
+                  Ok(EndArray), Ok(EndFile),
+              ),
+    );
+    test_read("[1e-]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "Missing exp `1e-`".into(), line: 0, column: 5 }),
+                  Ok(EndArray), Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_lonely_incomplete_number() {
+    test_read("-".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Err(JSONLexError { msg: "Missing digits `-`".into(), line: 0, column: 1 }),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("0.".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Err(JSONLexError { msg: "Missing decimals `0.`".into(), line: 0, column: 2 }),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Err(JSONLexError { msg: "Missing exp `1.5e`".into(), line: 0, column: 4 }),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("1.5e-".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Err(JSONLexError { msg: "Missing exp `1.5e-`".into(), line: 0, column: 5 }),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("\"foo".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Err(JSONLexError { msg: "Unfinished string `foo`".into(), line: 0, column: 4 }),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+/////////////
+// UNICODE //
+/////////////
+
+#[test]
+fn test_unicode() {
+    test_read("[\"\\ub9d0\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("말".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("[\"a\\ub9d0\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("a말".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("[\"\\ub9d0b\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("말b".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("[\"-\\uB9D0-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("-말-".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_wrong_unicode() {
+    test_read("[\"-\\uZ9D0-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "Unknown hex digit `Z`".into(), line: 0, column: 6 }),
+                  Ok(LexerToken::String("-9D0-".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+    test_read("[\"-\\uFDD0-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("-\u{fdd0}-".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_escape() {
+    test_read("[\"-\\\"-\\\\-\\b-\\f-\\n-\\r-\\t-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("-\"-\\-\u{8}-\u{c}-\n-\r-\t-".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
+}
+
+#[test]
+fn test_unexpected_char() {
+    test_read("*".as_bytes(), vec!(
+        Ok(BeginFile),
+        Err(JSONLexError { msg: "Unexpected char `*`".into(), line: 0, column: 1 }),
+        Ok(EndFile),
+    ));
+    test_read("foo".as_bytes(), vec!(
+        Ok(BeginFile),
+        Err(JSONLexError { msg: "Expected word `alse`".into(), line: 0, column: 2 }),
+        Err(JSONLexError { msg: "Unexpected char `o`".into(), line: 0, column: 3 }),
+        Ok(EndFile),
+    ));
+}
+
 
 fn test_file(path: &str, expected_tokens: Vec<Result<LexerToken, JSONLexError>>) {
     let f = fs::File::open(path).expect("no file found");
@@ -822,172 +1188,3 @@ fn test_read<R: Read>(read: R, expected_tokens: Vec<Result<LexerToken, JSONLexEr
     assert_eq!(expected_tokens, consumer.tokens);
 }
 
-#[test]
-fn test_end_numbers() {
-    test_read("0".as_bytes(),
-              vec!(Ok(IntValue("0".into()))));
-    test_read("-0".as_bytes(),
-              vec!(Ok(IntValue("0".into()))));
-    test_read("-0e7".as_bytes(),
-              vec!(Ok(FloatValue("-0e7".into()))));
-    test_read("1".as_bytes(),
-              vec!(Ok(IntValue("1".into()))));
-    test_read("1.5".as_bytes(),
-              vec!(Ok(FloatValue("1.5".into()))));
-    test_read("1.52".as_bytes(),
-              vec!(Ok(FloatValue("1.52".into()))));
-    test_read("1.5e-2".as_bytes(),
-              vec!(Ok(FloatValue("1.5e-2".into()))));
-    test_read("1.5e-27".as_bytes(),
-              vec!(Ok(FloatValue("1.5e-27".into()))));
-    test_read("1.5e2".as_bytes(),
-              vec!(Ok(FloatValue("1.5e2".into()))));
-    test_read("1.5e27".as_bytes(),
-              vec!(Ok(FloatValue("1.5e27".into()))));
-    test_read("-1".as_bytes(),
-              vec!(Ok(IntValue("-1".into()))));
-}
-
-#[test]
-fn test_numbers() {
-    test_read("0]".as_bytes(),
-              vec!(Ok(IntValue("0".into())), Ok(EndArray)));
-    test_read("-0]".as_bytes(),
-              vec!(Ok(IntValue("0".into())), Ok(EndArray)));
-    test_read("-0e7]".as_bytes(),
-              vec!(Ok(FloatValue("-0e7".into())), Ok(EndArray)));
-    test_read("1]".as_bytes(),
-              vec!(Ok(IntValue("1".into())), Ok(EndArray)));
-    test_read("1.5]".as_bytes(),
-              vec!(Ok(FloatValue("1.5".into())), Ok(EndArray)));
-    test_read("1.52]".as_bytes(),
-              vec!(Ok(FloatValue("1.52".into())), Ok(EndArray)));
-    test_read("1.5e-2]".as_bytes(),
-              vec!(Ok(FloatValue("1.5e-2".into())), Ok(EndArray)));
-    test_read("1.5e-27]".as_bytes(),
-              vec!(Ok(FloatValue("1.5e-27".into())), Ok(EndArray)));
-    test_read("1.5e2]".as_bytes(),
-              vec!(Ok(FloatValue("1.5e2".into())), Ok(EndArray)));
-    test_read("1.5e27]".as_bytes(),
-              vec!(Ok(FloatValue("1.5e27".into())), Ok(EndArray)));
-    test_read("-1]".as_bytes(),
-              vec!(Ok(IntValue("-1".into())), Ok(EndArray)));
-}
-
-#[test]
-fn test_unexpected_char() {
-    test_read("*".as_bytes(), vec!(
-        Err(JSONLexError { msg: "Unexpected char `*`".into(), line: 0, column: 1 })
-    ));
-    test_read("foo".as_bytes(), vec!(
-        Err(JSONLexError { msg: "Expected word `alse`".into(), line: 0, column: 2 }),
-        Err(JSONLexError { msg: "Unexpected char `o`".into(), line: 0, column: 3 }),
-    ));
-}
-
-#[test]
-fn test_wrong_number() {
-    test_read("[01]".as_bytes(),
-              vec!(
-                  Ok(BeginArray), Ok(IntValue("0".into())),
-                  Ok(IntValue("1".into())), Ok(EndArray),
-              ),
-    );
-    test_read("[1.]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Err(JSONLexError { msg: "Missing decimals `1.`".into(), line: 0, column: 4 }),
-                  Ok(EndArray)
-              ),
-    );
-    test_read("[-]".as_bytes(),
-               vec!(
-                    Ok(BeginArray),
-                    Err(JSONLexError { msg: "Expected a digit `]`".into(), line: 0, column: 3 }),
-                    Ok(EndArray)
-               )
-    );
-    test_read("[1.5e]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Err(JSONLexError { msg: "Missing exp `1.5e`".into(), line: 0, column: 6 }),
-                  Ok(EndArray)
-              )
-    );
-    test_read("[1e-]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Err(JSONLexError { msg: "Missing exp `1e-`".into(), line: 0, column: 5 }),
-                  Ok(EndArray)
-              )
-    );
-}
-
-#[test]
-fn test_end() {
-    test_read("-".as_bytes(),
-              vec!(Err(JSONLexError { msg: "Missing digits `-`".into(), line: 0, column: 1 })));
-    test_read("0.".as_bytes(),
-               vec!(Err(JSONLexError { msg: "Missing decimals `0.`".into(), line: 0, column: 2 })));
-    test_read("1.5e".as_bytes(),
-               vec!(Err(JSONLexError { msg: "Missing exp `1.5e`".into(), line: 0, column: 4 })));
-    test_read("1.5e-".as_bytes(),
-               vec!(Err(JSONLexError { msg: "Missing exp `1.5e-`".into(), line: 0, column: 5 })));
-    test_read("\"foo".as_bytes(),
-              vec!(Err(JSONLexError { msg: "Unfinished string `foo`".into(), line: 0, column: 4 })));
-}
-
-#[test]
-fn test_unicode() {
-    test_read("[\"\\ub9d0\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("말".into())),
-                  Ok(EndArray))
-    );
-    test_read("[\"a\\ub9d0\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("a말".into())),
-                  Ok(EndArray))
-    );
-    test_read("[\"\\ub9d0b\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("말b".into())),
-                  Ok(EndArray))
-    );
-    test_read("[\"-\\uB9D0-\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("-말-".into())),
-                  Ok(EndArray))
-    );
-}
-
-#[test]
-fn test_wrong_unicode() {
-    test_read("[\"-\\uZ9D0-\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Err(JSONLexError { msg: "Unknown hex digit `Z`".into(), line: 0, column: 6 }),
-                  Ok(LexerToken::String("-9D0-".into())),
-                  Ok(EndArray))
-    );
-    test_read("[\"-\\uFDD0-\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("-\u{fdd0}-".into())),
-                  Ok(EndArray))
-    );
-}
-
-#[test]
-fn test_escape() {
-    test_read("[\"-\\\"-\\\\-\\b-\\f-\\n-\\r-\\t-\"]".as_bytes(),
-              vec!(
-                  Ok(BeginArray),
-                  Ok(LexerToken::String("-\"-\\-\u{8}-\u{c}-\n-\r-\t-".into())),
-                  Ok(EndArray))
-    );
-}

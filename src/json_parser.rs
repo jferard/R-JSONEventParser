@@ -23,9 +23,12 @@ use std::io::Read;
 
 use crate::byte_source::ByteSource;
 use crate::json_lexer::{ConsumeError, JSONLexConsumer, JSONLexer, JSONLexError, LexerToken};
+use crate::json_lexer::LexerToken::BeginFile;
 
 #[derive(Debug, PartialEq)]
 pub enum ParserToken {
+    BeginFile,
+    EndFile,
     BeginObject,
     EndObject,
     BeginArray,
@@ -52,6 +55,7 @@ pub trait JSONParseConsumer {
 
 #[derive(Debug, PartialEq)]
 enum ParserState {
+    Undefined,
     None,
     InObject,
     InObjectMember,
@@ -98,8 +102,23 @@ impl<'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
             return Err(ConsumeError);
         }
         match self.state {
+            ParserState::Undefined => {
+                self.consumer.consume(match token {
+                    Ok(BeginFile) => {
+                        self.state = ParserState::None;
+                        Ok(ParserToken::BeginFile)
+                    }
+                    _ => parse_error!("Unexpected state")
+                })?
+            }
             ParserState::None => {
                 let token = match token {
+                    Ok(LexerToken::EndFile) => {
+                        match self.states.last() {
+                            Some(t) => parse_error!("Shoud be closed: {:?}", t),
+                            _ => Ok(ParserToken::EndFile)
+                        }
+                    }
                     Ok(LexerToken::BeginObject) => {
                         self.states.push(ParserState::None);
                         self.state = ParserState::InObject;
@@ -274,7 +293,7 @@ impl<'a, C: JSONParseConsumer> JSONLexerToParser<'a, C> {
     pub fn new(consumer: &'a mut C) -> Self {
         JSONLexerToParser {
             consumer,
-            state: ParserState::None,
+            state: ParserState::Undefined,
             states: vec!(),
         }
     }

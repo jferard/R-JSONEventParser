@@ -24,6 +24,7 @@ use std::io::Read;
 use std::str;
 
 use crate::byte_source::ByteSource;
+use crate::json_lexer::LexerToken::{BeginFile, EndFile};
 
 #[derive(Debug, PartialEq)]
 pub enum LexerToken {
@@ -38,6 +39,8 @@ pub enum LexerToken {
     String(String),
     IntValue(String),
     FloatValue(String),
+    BeginFile,
+    EndFile,
 }
 
 #[derive(Debug, PartialEq)]
@@ -130,6 +133,7 @@ impl<R: Read> JSONLexer<R> {
             }};
         }
 
+        consumer.consume(Ok(BeginFile), self.line, self.column)?;
 
         let mut state: LexerState = LexerState::None;
         let mut expect: &[u8; 4] = &[1u8, 2u8, 3u8, 4u8];
@@ -561,6 +565,7 @@ impl<R: Read> JSONLexer<R> {
             }
             _ => { consume_lex_error!("Unexpected sub_state"); }
         }
+        consumer.consume(Ok(EndFile), self.line, self.column)?;
         Ok(())
     }
 }
