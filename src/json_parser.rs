@@ -115,7 +115,7 @@ impl<'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
                 let token = match token {
                     Ok(LexerToken::EndFile) => {
                         match self.states.last() {
-                            Some(t) => parse_error!("Shoud be closed: {:?}", t),
+                            Some(t) => parse_error!("Should be closed: {:?}", t),
                             _ => Ok(ParserToken::EndFile)
                         }
                     }

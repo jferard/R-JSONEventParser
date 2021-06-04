@@ -22,3 +22,4 @@
 pub mod byte_source;
 pub mod json_lexer;
 pub mod json_parser;
+pub mod json2xml;
