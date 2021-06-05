@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+    <menu>
+        <header type="string">SVG Viewer</header>
+        <items>
+            <li>
+                <id type="string">Open</id>
+            </li>
+            <li>
+                <id type="string">OpenNew</id>
+                <label type="string">Open New</label>
+            </li>
+            <li type="null">None</li>
+            <li>
+                <id type="string">ZoomIn</id>
+                <label type="string">Zoom In</label>
+            </li>
+            <li>
+                <id type="string">ZoomOut</id>
+                <label type="string">Zoom Out</label>
+            </li>
+            <li>
+                <id type="string">OriginalView</id>
+                <label type="string">Original View</label>
+            </li>
+            <li type="null">None</li>
+            <li>
+                <id type="string">Quality</id>
+            </li>
+            <li>
+                <id type="string">Pause</id>
+            </li>
+            <li>
+                <id type="string">Mute</id>
+            </li>
+            <li type="null">None</li>
+            <li>
+                <id type="string">Find</id>
+                <label type="string">Find...</label>
+            </li>
+            <li>
+                <id type="string">FindAgain</id>
+                <label type="string">Find Again</label>
+            </li>
+            <li>
+                <id type="string">Copy</id>
+            </li>
+            <li>
+                <id type="string">CopyAgain</id>
+                <label type="string">Copy Again</label>
+            </li>
+            <li>
+                <id type="string">CopySVG</id>
+                <label type="string">Copy SVG</label>
+            </li>
+            <li>
+                <id type="string">ViewSVG</id>
+                <label type="string">View SVG</label>
+            </li>
+            <li>
+                <id type="string">ViewSource</id>
+                <label type="string">View Source</label>
+            </li>
+            <li>
+                <id type="string">SaveAs</id>
+                <label type="string">Save As</label>
+            </li>
+            <li type="null">None</li>
+            <li>
+                <id type="string">Help</id>
+            </li>
+            <li>
+                <id type="string">About</id>
+                <label type="string">About Adobe CVG Viewer...</label>
+            </li>
+        </items>
+    </menu>
+</root>

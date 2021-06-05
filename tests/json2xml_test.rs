@@ -20,7 +20,7 @@
  */
 
 use std::{fs, io};
-use std::io::{Read, Write};
+use std::io::{Read, Write, ErrorKind};
 
 use r_json_event_parser::byte_source::ByteSource;
 use r_json_event_parser::json2xml::JSON2XMLConsumer;
@@ -29,7 +29,8 @@ use r_json_event_parser::json_parser::JSONParser;
 #[test]
 fn lex_example1() {
     let path = "tests/files/example1.json";
-    test_file(path, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<glossary><title>example glossary</title><GlossDiv><title>S</title><GlossList><GlossEntry><ID>SGML</ID><SortAs>SGML</SortAs><GlossTerm>Standard Generalized Markup Language</GlossTerm><Acronym>SGML</Acronym><Abbrev>ISO 8879:1986</Abbrev><GlossDef><para>A meta-markup language, used to create markup languages such as DocBook.</para><GlossSeeAlso><li>GML</li><li>XML</li></GlossSeeAlso></GlossDef><GlossSee>markup</GlossSee></GlossEntry></GlossList></GlossDiv></glossary>");
+    let expected = fs::read_to_string("tests/files/example1.xml").unwrap();
+    test_file(path, expected.as_str());
 }
 
 fn test_file(path: &str, expected: &str) {
@@ -57,6 +58,9 @@ impl <'a> BufWrite<'a> {
 
 impl <'a> Write for &mut BufWrite<'a> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.index >= self.buf.len() {
+            return Err(io::Error::from(ErrorKind::OutOfMemory));
+        }
         let n = (&mut self.buf[self.index..]).write(buf)?;
         self.index += n;
         Ok(n)
@@ -71,7 +75,7 @@ fn test_read<R: Read>(read: R, expected: &str) {
     let byte_source = ByteSource::new(read);
     let mut buf = [0u8; 1024*1024];
     let mut destination = BufWrite::new(&mut buf);
-    let mut consumer = JSON2XMLConsumer::new(&mut destination);
+    let mut consumer = JSON2XMLConsumer::new(&mut destination, true, true);
     let mut parser = JSONParser::new(byte_source);
     let _ = parser.parse(&mut consumer);
     assert_eq!(expected, destination.to_str());
