@@ -52,14 +52,18 @@ impl<W: Write> JSONParseConsumer for JSON2XMLConsumer<W> {
             Ok(BeginFile) => {
                 self.destination.write_fmt(format_args!("{}\n<{}>\n", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root"))
             }
+            Ok(EndFile) => {
+                self.destination.write_fmt(format_args!("</{}>\n", "root"))
+            }
             Ok(BeginObject) | Ok(BeginArray) => {
                 let r = match self.states_stack.last() {
                     Some(BeginArray) => {
                         let cur_key = "li";
+                        self.keys_stack.push(cur_key.into());
                         if self.formatted {
-                            self.destination.write_fmt(format_args!("{: >1$}\n", cur_key, self.states_stack.len() * 4))
+                            self.destination.write_fmt(format_args!("{0: >1$}<{2}>\n", "", self.states_stack.len() * 4, cur_key))
                         } else {
-                            self.destination.write_fmt(format_args!("{}", cur_key)) // spaces
+                            self.destination.write_fmt(format_args!("<{}>", cur_key)) // spaces
                         }
                     }
                     Some(_) => {
@@ -99,13 +103,10 @@ impl<W: Write> JSONParseConsumer for JSON2XMLConsumer<W> {
                 self.keys_stack.push(s);
                 Ok(())
             }
-            Ok(EndFile) => {
-                self.destination.write_fmt(format_args!("</{}>\n", "root"))
-            }
             Ok(BooleanValue(b)) => {
                 let cur_key = self.get_cur_key()?;
                 let value = if b { "true".into() } else { "false".into() };
-                self.write_value(cur_key, "bool", value)
+                self.write_value(cur_key, "boolean", value)
             }
             Ok(NullValue) => {
                 let cur_key = self.get_cur_key()?;
@@ -113,7 +114,11 @@ impl<W: Write> JSONParseConsumer for JSON2XMLConsumer<W> {
             }
             Ok(StringValue(s)) => {
                 let cur_key = self.get_cur_key()?;
-                self.write_value(cur_key, "string", s)
+                if s.is_empty() {
+                    self.write_empty_string_value(cur_key)
+                } else {
+                    self.write_string_value(cur_key, s)
+                }
             }
             Ok(IntValue(s)) => {
                 let cur_key = self.get_cur_key()?;
@@ -123,7 +128,7 @@ impl<W: Write> JSONParseConsumer for JSON2XMLConsumer<W> {
                 let cur_key = self.get_cur_key()?;
                 self.write_value(cur_key, "float", s)
             }
-            _ => { return Err(ConsumeError); }
+            Err(_) => { return Err(ConsumeError); }
         };
         match result {
             Ok(_) => { Ok(()) }
@@ -154,6 +159,51 @@ impl<W: Write> JSON2XMLConsumer<W> {
             } else {
                 self.destination.write_fmt(format_args!("<{0}>{1}</{0}>", cur_key, value))
             }
+        }
+    }
+
+    fn write_string_value(&mut self, cur_key: String, value: String) -> io::Result<()> {
+        let e_value = JSON2XMLConsumer::<W>::escape_value(value);
+        if self.formatted {
+            if self.typed {
+                self.destination.write_fmt(format_args!("{0: >1$}<{2} type=\"string\">{3}</{2}>\n", "", self.states_stack.len() * 4, cur_key, e_value))
+            } else {
+                self.destination.write_fmt(format_args!("{0: >1$}<{2}>{3}</{2}>\n", "", self.states_stack.len() * 4, cur_key, e_value))
+            }
+        } else {
+            if self.typed {
+                self.destination.write_fmt(format_args!("<{0} type=\"string\">{1}</{0}>", cur_key, e_value))
+            } else {
+                self.destination.write_fmt(format_args!("<{0}>{1}</{0}>", cur_key, e_value))
+            }
+        }
+    }
+
+    fn write_empty_string_value(&mut self, cur_key: String) -> io::Result<()> {
+        if self.formatted {
+            if self.typed {
+                self.destination.write_fmt(format_args!("{0: >1$}<{2} type=\"string\"/>\n", "", self.states_stack.len() * 4, cur_key))
+            } else {
+                self.destination.write_fmt(format_args!("{0: >1$}<{2}/>\n", "", self.states_stack.len() * 4, cur_key))
+            }
+        } else {
+            if self.typed {
+                self.destination.write_fmt(format_args!("<{0} type=\"string\"/>", cur_key))
+            } else {
+                self.destination.write_fmt(format_args!("<{0}/>", cur_key))
+            }
+        }
+    }
+
+    fn escape_value(s: String) -> String {
+        if s.find(&['<', '>', '&', '"', '\''][..]).is_some() {
+            if s.find("]]>").is_some() {
+                format!("{}{}{}", "<![CDATA[", s.replace("]]>", "]]]]><![CDATA[>"), "]]>")
+            } else {
+                format!("{}{}{}", "<![CDATA[", s, "]]>")
+            }
+        } else {
+            s
         }
     }
 }

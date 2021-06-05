@@ -33,6 +33,34 @@ fn lex_example1() {
     test_file(path, expected.as_str());
 }
 
+#[test]
+fn lex_example2() {
+    let path = "tests/files/example2.json";
+    let expected = fs::read_to_string("tests/files/example2.xml").unwrap();
+    test_file(path, expected.as_str());
+}
+
+#[test]
+fn lex_example3() {
+    let path = "tests/files/example3.json";
+    let expected = fs::read_to_string("tests/files/example3.xml").unwrap();
+    test_file(path, expected.as_str());
+}
+
+#[test]
+fn lex_example4() {
+    let path = "tests/files/example4.json";
+    let expected = fs::read_to_string("tests/files/example4.xml").unwrap();
+    test_file(path, expected.as_str());
+}
+
+#[test]
+fn lex_example5() {
+    let path = "tests/files/example5.json";
+    let expected = fs::read_to_string("tests/files/example5.xml").unwrap();
+    test_file(path, expected.as_str());
+}
+
 fn test_file(path: &str, expected: &str) {
     let f = fs::File::open(path).expect("no file found");
     test_read(f, expected);
