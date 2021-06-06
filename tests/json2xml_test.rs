@@ -103,7 +103,7 @@ fn test_read<R: Read>(read: R, expected: &str) {
     let byte_source = ByteSource::new(read);
     let mut buf = [0u8; 1024*1024];
     let mut destination = BufWrite::new(&mut buf);
-    let mut consumer = JSON2XMLConsumer::new(&mut destination, true, true);
+    let mut consumer = JSON2XMLConsumer::new_formatted_and_typed(&mut destination);
     let mut parser = JSONParser::new(byte_source);
     let _ = parser.parse(&mut consumer);
     assert_eq!(expected, destination.to_str());
