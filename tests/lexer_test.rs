@@ -1144,6 +1144,15 @@ fn test_wrong_unicode() {
                   Ok(EndFile),
               ),
     );
+    test_read("[\"-\\ud83d-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Err(JSONLexError { msg: "This is not a code point `55357`".into(), line: 0, column: 9 }),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
 }
 
 #[test]
@@ -1183,7 +1192,7 @@ fn test_file(path: &str, expected_tokens: Vec<Result<LexerToken, JSONLexError>>)
 fn test_read<R: Read>(read: R, expected_tokens: Vec<Result<LexerToken, JSONLexError>>) {
     let byte_source = ByteSource::new(read);
     let mut consumer = AssertEqualsConsumer::new();
-    let mut lexer = JSONLexer::new(byte_source);
+    let mut lexer = JSONLexer::new(byte_source, false);
     let _ = lexer.lex(&mut consumer);
     assert_eq!(expected_tokens, consumer.tokens);
 }

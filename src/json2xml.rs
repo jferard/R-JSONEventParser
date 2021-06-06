@@ -88,6 +88,17 @@ impl<W: Write> XMLWrite<W> for FormattedTypedXMLWrite<W> {
     }
 }
 
+impl<W: Write> JSON2XMLConsumer<W, FormattedTypedXMLWrite<W>> {
+    pub fn new_formatted_and_typed(destination: W) -> JSON2XMLConsumer<W, FormattedTypedXMLWrite<W>> {
+        JSON2XMLConsumer {
+            xml_write: FormattedTypedXMLWrite { destination },
+            states_stack: vec!(),
+            keys_stack: vec!(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 pub struct FormattedXMLWrite<W: Write> {
     destination: W,
 }
@@ -120,6 +131,17 @@ impl<W: Write> XMLWrite<W> for FormattedXMLWrite<W> {
 
     fn write_end(&mut self, size: usize, cur_key: &str) -> io::Result<()> {
         self.destination.write_fmt(format_args!("{0: >1$}</{2}>\n", "", size, cur_key))
+    }
+}
+
+impl<W: Write> JSON2XMLConsumer<W, FormattedXMLWrite<W>> {
+    pub fn new_formatted(destination: W) -> JSON2XMLConsumer<W, FormattedXMLWrite<W>> {
+        JSON2XMLConsumer {
+            xml_write: FormattedXMLWrite { destination },
+            states_stack: vec!(),
+            keys_stack: vec!(),
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -158,6 +180,16 @@ impl<W: Write> XMLWrite<W> for TypedXMLWrite<W> {
     }
 }
 
+impl<W: Write> JSON2XMLConsumer<W, TypedXMLWrite<W>> {
+    pub fn new_typed(destination: W) -> JSON2XMLConsumer<W, TypedXMLWrite<W>> {
+        JSON2XMLConsumer {
+            xml_write: TypedXMLWrite { destination },
+            states_stack: vec!(),
+            keys_stack: vec!(),
+            phantom: PhantomData,
+        }
+    }
+}
 
 pub struct RawXMLWrite<W: Write> {
     destination: W,
@@ -194,46 +226,6 @@ impl<W: Write> XMLWrite<W> for RawXMLWrite<W> {
     }
 }
 
-pub struct JSON2XMLConsumer<W: Write, T: XMLWrite<W>> {
-    pub states_stack: Vec<ParserToken>,
-    pub keys_stack: Vec<String>,
-    pub xml_write: T,
-    phantom: PhantomData<W>,
-}
-
-impl<W: Write> JSON2XMLConsumer<W, FormattedTypedXMLWrite<W>> {
-    pub fn new_formatted_and_typed(destination: W) -> JSON2XMLConsumer<W, FormattedTypedXMLWrite<W>> {
-        JSON2XMLConsumer {
-            xml_write: FormattedTypedXMLWrite { destination },
-            states_stack: vec!(),
-            keys_stack: vec!(),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<W: Write> JSON2XMLConsumer<W, FormattedXMLWrite<W>> {
-    pub fn new_formatted(destination: W) -> JSON2XMLConsumer<W, FormattedXMLWrite<W>> {
-        JSON2XMLConsumer {
-            xml_write: FormattedXMLWrite { destination },
-            states_stack: vec!(),
-            keys_stack: vec!(),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<W: Write> JSON2XMLConsumer<W, TypedXMLWrite<W>> {
-    pub fn new_typed(destination: W) -> JSON2XMLConsumer<W, TypedXMLWrite<W>> {
-        JSON2XMLConsumer {
-            xml_write: TypedXMLWrite { destination },
-            states_stack: vec!(),
-            keys_stack: vec!(),
-            phantom: PhantomData,
-        }
-    }
-}
-
 impl<W: Write> JSON2XMLConsumer<W, RawXMLWrite<W>> {
     pub fn new_raw(destination: W) -> JSON2XMLConsumer<W, RawXMLWrite<W>> {
         JSON2XMLConsumer {
@@ -243,6 +235,13 @@ impl<W: Write> JSON2XMLConsumer<W, RawXMLWrite<W>> {
             phantom: PhantomData,
         }
     }
+}
+
+pub struct JSON2XMLConsumer<W: Write, T: XMLWrite<W>> {
+    pub states_stack: Vec<ParserToken>,
+    pub keys_stack: Vec<String>,
+    pub xml_write: T,
+    phantom: PhantomData<W>,
 }
 
 impl<W: Write, T: XMLWrite<W>> JSONParseConsumer for JSON2XMLConsumer<W, T> {
@@ -268,7 +267,11 @@ impl<W: Write, T: XMLWrite<W>> JSONParseConsumer for JSON2XMLConsumer<W, T> {
                     None => { Ok(()) }
                 };
                 match r {
-                    Err(_) => { return Err(ConsumeError); }
+                    Err(e) => { return Err(ConsumeError {
+                        msg: format!("write error {:?}", e.kind()),
+                        line: 0,
+                        column: 0,
+                    }); }
                     _ => {}
                 }
                 self.states_stack.push(token.unwrap());
@@ -291,42 +294,54 @@ impl<W: Write, T: XMLWrite<W>> JSONParseConsumer for JSON2XMLConsumer<W, T> {
                 Ok(())
             }
             Ok(BooleanValue(b)) => {
-                let cur_key = self.get_cur_key()?;
+                let cur_key = self.get_cur_key();
                 let value = if b { "true".into() } else { "false".into() };
                 self.xml_write.write_value(self.states_stack.len() * 4, cur_key, "boolean", value)
             }
             Ok(NullValue) => {
-                let cur_key = self.get_cur_key()?;
+                let cur_key = self.get_cur_key();
                 self.xml_write.write_value(self.states_stack.len() * 4, cur_key, "null", String::from("null"))
             }
             Ok(StringValue(s)) => {
-                let cur_key = self.get_cur_key()?;
+                let cur_key = self.get_cur_key();
                 self.xml_write.write_string_value(self.states_stack.len() * 4, cur_key, s)
             }
             Ok(IntValue(s)) => {
-                let cur_key = self.get_cur_key()?;
+                let cur_key = self.get_cur_key();
                 self.xml_write.write_value(self.states_stack.len() * 4, cur_key, "int", s)
             }
             Ok(FloatValue(s)) => {
-                let cur_key = self.get_cur_key()?;
+                let cur_key = self.get_cur_key();
                 self.xml_write.write_value(self.states_stack.len() * 4, cur_key, "float", s)
             }
-            Err(_) => { return Err(ConsumeError); }
+            Err(e) => {
+                return Err(ConsumeError {
+                    msg: e.msg,
+                    line: e.line,
+                    column: e.column,
+                });
+            }
         };
         match result {
             Ok(_) => { Ok(()) }
-            Err(_) => { Err(ConsumeError) }
+            Err(e) => {
+                return Err(ConsumeError {
+                    msg: format!("write error {:?}", e.kind()),
+                    line: 0,
+                    column: 0,
+                });
+            }
         }
     }
 }
 
 
 impl<W: Write, T: XMLWrite<W>> JSON2XMLConsumer<W, T> {
-    fn get_cur_key(&mut self) -> Result<String, ConsumeError> {
+    fn get_cur_key(&mut self) -> String {
         match self.states_stack.last() {
-            Some(BeginArray) => { Ok("li".into()) }
-            Some(_) => { Ok(self.keys_stack.pop().unwrap()) }
-            None => { return Err(ConsumeError); }
+            Some(BeginArray) => { "li".into() }
+            Some(_) => { self.keys_stack.pop().unwrap() }
+            None => { panic!() }
         }
     }
 }

@@ -61,11 +61,6 @@ fn lex_example5() {
     test_file(path, expected.as_str());
 }
 
-fn test_file(path: &str, expected: &str) {
-    let f = fs::File::open(path).expect("no file found");
-    test_read(f, expected);
-}
-
 struct BufWrite<'a> {
     index: usize,
     buf: &'a mut [u8]
@@ -99,12 +94,17 @@ impl <'a> Write for &mut BufWrite<'a> {
     }
 }
 
+fn test_file(path: &str, expected: &str) {
+    let f = fs::File::open(path).expect("no file found");
+    test_read(f, expected);
+}
+
 fn test_read<R: Read>(read: R, expected: &str) {
     let byte_source = ByteSource::new(read);
     let mut buf = [0u8; 1024*1024];
     let mut destination = BufWrite::new(&mut buf);
     let mut consumer = JSON2XMLConsumer::new_formatted_and_typed(&mut destination);
-    let mut parser = JSONParser::new(byte_source);
+    let mut parser = JSONParser::new(byte_source, false);
     let _ = parser.parse(&mut consumer);
     assert_eq!(expected, destination.to_str());
 }

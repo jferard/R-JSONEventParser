@@ -50,7 +50,12 @@ pub struct JSONLexError {
     pub column: usize,
 }
 
-pub struct ConsumeError;
+#[derive(Debug, PartialEq)]
+pub struct ConsumeError {
+    pub msg: String,
+    pub line: usize,
+    pub column: usize,
+}
 
 pub trait JSONLexConsumer {
     fn consume(&mut self, token: Result<LexerToken, JSONLexError>, line: usize, column: usize) -> Result<(), ConsumeError>;
@@ -88,14 +93,16 @@ pub struct JSONLexer<R: Read> {
     byte_source: ByteSource<R>,
     line: usize,
     column: usize,
+    ignore_unicode_errs: bool,
 }
 
 impl<R: Read> JSONLexer<R> {
-    pub fn new(byte_source: ByteSource<R>) -> Self {
+    pub fn new(byte_source: ByteSource<R>, ignore_unicode_errs: bool) -> Self {
         JSONLexer {
             byte_source,
             line: 0,
             column: 0,
+            ignore_unicode_errs,
         }
     }
 
@@ -455,7 +462,13 @@ impl<R: Read> JSONLexer<R> {
                                             buf.append(&mut utf8_bytes.as_bytes().to_vec());
                                         }
                                         None => {
-                                            consume_lex_error!("This is not a code point `{}`", code_point);
+                                            if self.ignore_unicode_errs {
+                                                let mut bytes = [0u8; 4];
+                                                let utf8_bytes = char::from_u32(0xfffdu32).unwrap().encode_utf8(&mut bytes);
+                                                buf.append(&mut utf8_bytes.as_bytes().to_vec());
+                                            } else {
+                                                consume_lex_error!("This is not a code point `{}`", code_point);
+                                            }
                                         }
                                     };
                                     end_of_unicode!(code_point, unicode_index, string_sub_state);

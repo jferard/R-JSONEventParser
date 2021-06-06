@@ -95,11 +95,15 @@ impl<'a, C: JSONParseConsumer> JSONLexConsumer for JSONLexerToParser<'a, C> {
 
         if let Err(e) = token {
             self.consumer.consume(Err(JSONParseError {
-                msg: e.msg,
+                msg: e.msg.clone(),
                 line: e.line,
                 column: e.column,
             }))?;
-            return Err(ConsumeError);
+            return Err(ConsumeError {
+                msg: e.msg,
+                line: e.line,
+                column: e.column,
+            });
         }
         match self.state {
             ParserState::Undefined => {
@@ -300,9 +304,9 @@ impl<'a, C: JSONParseConsumer> JSONLexerToParser<'a, C> {
 }
 
 impl<R: Read> JSONParser<R> {
-    pub fn new(byte_source: ByteSource<R>) -> Self {
+    pub fn new(byte_source: ByteSource<R>, ignore_unicode_errs: bool) -> Self {
         JSONParser {
-            json_lexer: JSONLexer::new(byte_source),
+            json_lexer: JSONLexer::new(byte_source, ignore_unicode_errs),
         }
     }
 

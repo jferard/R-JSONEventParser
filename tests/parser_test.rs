@@ -103,7 +103,7 @@ fn test_file(path: &str, expected_tokens: Vec<Result<ParserToken, JSONParseError
 fn test_read<R: Read>(read: R, expected_tokens: Vec<Result<ParserToken, JSONParseError>>) {
     let byte_source = ByteSource::new(read);
     let mut consumer = AssertEqualsConsumer::new();
-    let mut parser = JSONParser::new(byte_source);
+    let mut parser = JSONParser::new(byte_source, false);
     let _ = parser.parse(&mut consumer);
     assert_eq!(expected_tokens, consumer.tokens);
 }
