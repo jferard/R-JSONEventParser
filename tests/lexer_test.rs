@@ -1149,6 +1149,7 @@ fn test_wrong_unicode() {
                   Ok(BeginFile),
                   Ok(BeginArray),
                   Err(JSONLexError { msg: "This is not a code point `55357`".into(), line: 0, column: 9 }),
+                  Ok(LexerToken::String("--".into())),
                   Ok(EndArray),
                   Ok(EndFile),
               ),

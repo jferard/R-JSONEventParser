@@ -59,32 +59,32 @@ pub struct FormattedTypedXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for FormattedTypedXMLWrite<W> {
     fn write_value(&mut self, size: usize, cur_key: String, value_type: &str, value: String) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}<{2} type=\"{3}\">{4}</{2}>\n", "", size, cur_key, value_type, value))
+        write!(self.destination, "{0: >1$}<{2} type=\"{3}\">{4}</{2}>\n", "", size, cur_key, value_type, value)
     }
 
     fn write_string_value(&mut self, size: usize, cur_key: String, value: String) -> io::Result<()> {
         if value.is_empty() {
-            self.destination.write_fmt(format_args!("{0: >1$}<{2} type=\"string\"/>\n", "", size, cur_key))
+            write!(self.destination, "{0: >1$}<{2} type=\"string\"/>\n", "", size, cur_key)
         } else {
             let e_value = FormattedTypedXMLWrite::<W>::escape_value(value);
-            self.destination.write_fmt(format_args!("{0: >1$}<{2} type=\"string\">{3}</{2}>\n", "", size, cur_key, e_value))
+            write!(self.destination, "{0: >1$}<{2} type=\"string\">{3}</{2}>\n", "", size, cur_key, e_value)
         }
     }
 
     fn write_open(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{}\n<{}>\n", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root"))
+        write!(self.destination, "{}\n<{}>\n", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root")
     }
 
     fn write_close(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>\n", "root"))
+        write!(self.destination, "</{}>\n", "root")
     }
 
     fn write_begin(&mut self, size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}<{2}>\n", "", size, cur_key))
+        write!(self.destination, "{0: >1$}<{2}>\n", "", size, cur_key)
     }
 
     fn write_end(&mut self, size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}</{2}>\n", "", size, cur_key))
+        write!(self.destination, "{0: >1$}</{2}>\n", "", size, cur_key)
     }
 }
 
@@ -105,32 +105,32 @@ pub struct FormattedXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for FormattedXMLWrite<W> {
     fn write_value(&mut self, size: usize, cur_key: String, _value_type: &str, value: String) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}<{2}>{3}</{2}>\n", "", size, cur_key, value))
+        write!(self.destination, "{0: >1$}<{2}>{3}</{2}>\n", "", size, cur_key, value)
     }
 
     fn write_string_value(&mut self, size: usize, cur_key: String, value: String) -> io::Result<()> {
         if value.is_empty() {
-            self.destination.write_fmt(format_args!("{0: >1$}<{2}/>\n", "", size, cur_key))
+            write!(self.destination, "{0: >1$}<{2}/>\n", "", size, cur_key)
         } else {
             let e_value = FormattedXMLWrite::<W>::escape_value(value);
-            self.destination.write_fmt(format_args!("{0: >1$}<{2}>{3}</{2}>\n", "", size, cur_key, e_value))
+            write!(self.destination, "{0: >1$}<{2}>{3}</{2}>\n", "", size, cur_key, e_value)
         }
     }
 
     fn write_open(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{}\n<{}>\n", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root"))
+        write!(self.destination, "{}\n<{}>\n", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root")
     }
 
     fn write_close(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>\n", "root"))
+        write!(self.destination, "</{}>\n", "root")
     }
 
     fn write_begin(&mut self, size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}<{2}>\n", "", size, cur_key))
+        write!(self.destination, "{0: >1$}<{2}>\n", "", size, cur_key)
     }
 
     fn write_end(&mut self, size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{0: >1$}</{2}>\n", "", size, cur_key))
+        write!(self.destination, "{0: >1$}</{2}>\n", "", size, cur_key)
     }
 }
 
@@ -151,32 +151,32 @@ pub struct TypedXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for TypedXMLWrite<W> {
     fn write_value(&mut self, _size: usize, cur_key: String, value_type: &str, value: String) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("<{0} type=\"{1}\">{2}</{0}>\n", cur_key, value_type, value))
+        write!(self.destination, "<{0} type=\"{1}\">{2}</{0}>\n", cur_key, value_type, value)
     }
 
     fn write_string_value(&mut self, _size: usize, cur_key: String, value: String) -> io::Result<()> {
         if value.is_empty() {
-            self.destination.write_fmt(format_args!("<{0} type=\"string\"/>", cur_key))
+            write!(self.destination, "<{0} type=\"string\"/>", cur_key)
         } else {
             let e_value = TypedXMLWrite::<W>::escape_value(value);
-            self.destination.write_fmt(format_args!("<{0} type=\"string\">{1}</{0}>", cur_key, e_value))
+            write!(self.destination, "<{0} type=\"string\">{1}</{0}>", cur_key, e_value)
         }
     }
 
     fn write_open(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{}\n<{}>", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root"))
+        write!(self.destination, "{}\n<{}>", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root")
     }
 
     fn write_close(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>", "root"))
+        write!(self.destination, "</{}>", "root")
     }
 
     fn write_begin(&mut self, _size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("<{}>", cur_key))
+        write!(self.destination, "<{}>", cur_key)
     }
 
     fn write_end(&mut self, _size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>", cur_key))
+        write!(self.destination, "</{}>", cur_key)
     }
 }
 
@@ -197,32 +197,32 @@ pub struct RawXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for RawXMLWrite<W> {
     fn write_value(&mut self, _size: usize, cur_key: String, _value_type: &str, value: String) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("<{0}>{1}</{0}>\n", cur_key, value))
+        write!(self.destination, "<{0}>{1}</{0}>\n", cur_key, value)
     }
 
     fn write_string_value(&mut self, _size: usize, cur_key: String, value: String) -> io::Result<()> {
         if value.is_empty() {
-            self.destination.write_fmt(format_args!("<{0}/>", cur_key))
+            write!(self.destination, "<{0}/>", cur_key)
         } else {
             let e_value = RawXMLWrite::<W>::escape_value(value);
-            self.destination.write_fmt(format_args!("<{0}>{1}</{0}>", cur_key, e_value))
+            write!(self.destination, "<{0}>{1}</{0}>", cur_key, e_value)
         }
     }
 
     fn write_open(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("{}\n<{}>", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root"))
+        write!(self.destination, "{}\n<{}>", "<?xml version=\"1.0\" encoding=\"utf-8\"?>", "root")
     }
 
     fn write_close(&mut self) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>", "root"))
+        write!(self.destination, "</{}>", "root")
     }
 
     fn write_begin(&mut self, _size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("<{}>", cur_key))
+        write!(self.destination, "<{}>", cur_key)
     }
 
     fn write_end(&mut self, _size: usize, cur_key: &str) -> io::Result<()> {
-        self.destination.write_fmt(format_args!("</{}>", cur_key))
+        write!(self.destination, "</{}>", cur_key)
     }
 }
 
