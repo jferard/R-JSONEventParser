@@ -23,7 +23,7 @@ use std::{fs, io};
 use std::io::{Write, ErrorKind};
 
 use r_json_event_parser::byte_source::ByteSource;
-use r_json_event_parser::json2xml::JSON2XMLConsumer;
+use r_json_event_parser::json2xml::{JSON2XMLConsumer};
 use r_json_event_parser::json_parser::JSONParser;
 
 #[test]
@@ -37,7 +37,7 @@ fn lex_example1() {
     let byte_source = ByteSource::new(read);
     let mut buf = [0u8; 1024*1024];
     let mut destination = BufWrite::new(&mut buf);
-    let mut consumer = JSON2XMLConsumer::new_formatted_and_typed(&mut destination);
+    let mut consumer= JSON2XMLConsumer::new_formatted_and_typed(&mut destination);
     let mut parser = JSONParser::new(byte_source, false);
     let _ = parser.parse(&mut consumer);
     assert_eq!(expected, destination.to_str());
@@ -103,7 +103,7 @@ fn lex_example1_no_format_no_type() {
     let byte_source = ByteSource::new(f);
     let mut buf = [0u8; 1024*1024];
     let mut destination = BufWrite::new(&mut buf);
-    let mut consumer = JSON2XMLConsumer::new_raw(&mut destination);
+    let mut consumer = JSON2XMLConsumer::new(&mut destination);
     let mut parser = JSONParser::new(byte_source, false);
     let _ = parser.parse(&mut consumer);
     assert_eq!(r#"<?xml version="1.0" encoding="utf-8"?>

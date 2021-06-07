@@ -151,7 +151,7 @@ pub struct TypedXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for TypedXMLWrite<W> {
     fn write_value(&mut self, _size: usize, cur_key: String, value_type: &str, value: String) -> io::Result<()> {
-        write!(self.destination, "<{0} type=\"{1}\">{2}</{0}>\n", cur_key, value_type, value)
+        write!(self.destination, "<{0} type=\"{1}\">{2}</{0}>", cur_key, value_type, value)
     }
 
     fn write_string_value(&mut self, _size: usize, cur_key: String, value: String) -> io::Result<()> {
@@ -197,7 +197,7 @@ pub struct RawXMLWrite<W: Write> {
 
 impl<W: Write> XMLWrite<W> for RawXMLWrite<W> {
     fn write_value(&mut self, _size: usize, cur_key: String, _value_type: &str, value: String) -> io::Result<()> {
-        write!(self.destination, "<{0}>{1}</{0}>\n", cur_key, value)
+        write!(self.destination, "<{0}>{1}</{0}>", cur_key, value)
     }
 
     fn write_string_value(&mut self, _size: usize, cur_key: String, value: String) -> io::Result<()> {
@@ -227,7 +227,7 @@ impl<W: Write> XMLWrite<W> for RawXMLWrite<W> {
 }
 
 impl<W: Write> JSON2XMLConsumer<W, RawXMLWrite<W>> {
-    pub fn new_raw(destination: W) -> JSON2XMLConsumer<W, RawXMLWrite<W>> {
+    pub fn new(destination: W) -> JSON2XMLConsumer<W, RawXMLWrite<W>> {
         JSON2XMLConsumer {
             xml_write: RawXMLWrite { destination },
             states_stack: vec!(),

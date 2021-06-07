@@ -20,12 +20,11 @@
  */
 
 use std::{fs, io};
+use std::io::{BufWriter, Write};
 
 use r_json_event_parser::byte_source::ByteSource;
 use r_json_event_parser::json2xml::JSON2XMLConsumer;
 use r_json_event_parser::json_parser::JSONParser;
-use std::io::{Write, BufWriter};
-
 
 fn main() {
     extern crate clap;
@@ -40,11 +39,23 @@ fn main() {
         .arg(Arg::with_name("outfile")
             .help("XML file")
             .index(2))
+        .arg(Arg::with_name("formatted")
+            .short("f")
+            .long("formatted")
+            .help("format the XML (use with caution: '
+    'huge files may be generated because of spaces)")
+            .takes_value(false))
+        .arg(Arg::with_name("typed")
+            .short("t")
+            .long("typed")
+            .help("type tags")
+            .takes_value(false))
         .get_matches();
 
     let inpath = matches.value_of("infile").unwrap_or("-");
     let outpath = matches.value_of("outfile").unwrap_or("-");
-
+    let formatted = matches.is_present("formatted");
+    let typed = matches.is_present("typed");
     let infile: Box<dyn io::Read> = if inpath == "-" {
         Box::new(io::stdin())
     } else {
@@ -56,10 +67,26 @@ fn main() {
         Box::new(BufWriter::new(fs::File::create(outpath).expect("no file found")))
     };
     let byte_source = ByteSource::new(infile);
-    let mut consumer = JSON2XMLConsumer::new_formatted_and_typed(outfile);
     let mut parser = JSONParser::new(byte_source, true);
-    match parser.parse(&mut consumer) {
+    let r = if formatted {
+        if typed {
+            let mut consumer = JSON2XMLConsumer::new_formatted_and_typed(outfile);
+            parser.parse(&mut consumer)
+        } else {
+            let mut consumer = JSON2XMLConsumer::new_formatted(outfile);
+            parser.parse(&mut consumer)
+        }
+    } else {
+        if typed {
+            let mut consumer = JSON2XMLConsumer::new_typed(outfile);
+            parser.parse(&mut consumer)
+        } else {
+            let mut consumer = JSON2XMLConsumer::new(outfile);
+            parser.parse(&mut consumer)
+        }
+    }
+    match r {
         Ok(_) => {}
-        Err(e) => { io::stderr().write_fmt(format_args!("Err {:?}", e)).unwrap(); }
+        Err(e) => { write!(io::stderr(), "Err {:?}", e).unwrap(); }
     }
 }
