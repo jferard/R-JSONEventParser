@@ -1121,6 +1121,15 @@ fn test_unicode() {
                   Ok(EndFile),
               ),
     );
+    test_read("[\"-\\ud83c\\udf09-\"]".as_bytes(),
+              vec!(
+                  Ok(BeginFile),
+                  Ok(BeginArray),
+                  Ok(LexerToken::String("-🌉-".into())),
+                  Ok(EndArray),
+                  Ok(EndFile),
+              ),
+    );
 }
 
 #[test]
