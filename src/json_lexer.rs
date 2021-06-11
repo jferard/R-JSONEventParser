@@ -115,7 +115,7 @@ impl<R: Read> JSONLexer<R> {
                     line: self.line,
                     column: self.column,
                 })
-            }}
+            }};
         }
 
         macro_rules! consume_lex_error {
@@ -182,6 +182,18 @@ impl<R: Read> JSONLexer<R> {
                 }
             }};
         }
+
+        macro_rules! replacement_char_or_err {
+            ($buf:ident, $code_point: ident) => {{
+                if self.ignore_unicode_errs {
+                    let utf8_bytes = REPLACEMENT_CHARACTER.encode_utf8(&mut bytes);
+                    $buf.append(&mut utf8_bytes.as_bytes().to_vec());
+                } else {
+                    consume_lex_error!("This is not a code point `{}`", $code_point)
+                }
+            }};
+        }
+
 
         consumer.consume(Ok(BeginFile), self.line, self.column)?;
 
@@ -464,8 +476,12 @@ impl<R: Read> JSONLexer<R> {
                                         }
                                     }
                                     if unicode_index == 4 {
+                                        // high surrogate
                                         if 0xd800 <= code_point && code_point <= 0xdbff {
                                             high = code_point;
+                                        // low surrogate
+                                        } else if 0xdc00 <= code_point && code_point <= 0xdfff {
+                                            replacement_char_or_err!(buf, code_point);
                                         } else {
                                             try_to_append_code_point!(buf, code_point);
                                         }
@@ -516,6 +532,7 @@ impl<R: Read> JSONLexer<R> {
                                         }
                                     }
                                     if unicode_index == 4 {
+                                        // low surrogate
                                         if 0xdc00 <= code_point && code_point <= 0xdfff {
                                             code_point = 0x10000 + (high - 0xd800) * 0x400 + code_point - 0xdc00;
                                             try_to_append_code_point!(buf, code_point);
