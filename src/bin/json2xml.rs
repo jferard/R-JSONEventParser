@@ -84,7 +84,7 @@ fn main() {
             let mut consumer = JSON2XMLConsumer::new(outfile);
             parser.parse(&mut consumer)
         }
-    }
+    };
     match r {
         Ok(_) => {}
         Err(e) => { write!(io::stderr(), "Err {:?}", e).unwrap(); }

@@ -1148,7 +1148,7 @@ fn test_wrong_unicode() {
               vec!(
                   Ok(BeginFile),
                   Ok(BeginArray),
-                  Err(JSONLexError { msg: "This is not a code point `55357`".into(), line: 0, column: 9 }),
+                  Err(JSONLexError { msg: "Waiting for low surrogate: needs backslash, got `-`".into(), line: 0, column: 10 }),
                   Ok(LexerToken::String("--".into())),
                   Ok(EndArray),
                   Ok(EndFile),
